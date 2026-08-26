@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Message in a Bottle</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#e6eef4; --dim:#8ba3b3; --sea:#081420; --glass:#0d1a28d9;
+    --line:#1f3547; --accent:#eec87a; --accent-soft:#eec87a33;
+    --foam:#84d9c6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--sea);color:var(--ink);overflow:hidden;
+    font-family:'Jost',sans-serif;font-weight:300;}
+  ::selection{background:#eec87a44;color:#fff}
+
+  #map{position:fixed;inset:0;background:#06101a}
+  .leaflet-tile-pane{filter:saturate(.45) brightness(.62) contrast(1.05)}
+  .leaflet-container{font-family:'Jost',sans-serif}
+
+  /* ---------- cinematic overlays ---------- */
+  #vignette{position:fixed;inset:0;z-index:800;pointer-events:none;
+    background:
+      radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(2,7,12,.55) 100%),
+      linear-gradient(180deg, rgba(4,10,17,.5) 0%, transparent 18%, transparent 82%, rgba(4,10,17,.6) 100%);
+  }
+  #grain{position:fixed;inset:0;z-index:801;pointer-events:none;opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ---------- header ---------- */
+  header{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;
+    align-items:flex-start;justify-content:space-between;padding:22px 28px;
+    pointer-events:none;}
+  .brand h1{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:500;
+    letter-spacing:.16em;text-transform:uppercase;color:#f2ede1;
+    text-shadow:0 2px 24px rgba(0,0,0,.8);}
+  .brand h1 span{color:var(--accent);font-style:italic;text-transform:none;
+    letter-spacing:.04em;padding:0 .12em;}
+  .brand p{font-size:11px;letter-spacing:.34em;text-transform:uppercase;
+    color:var(--dim);margin-top:2px;padding-left:.34em;}
+
+  .hud{display:flex;gap:12px;pointer-events:auto;margin-top:6px}
+  .hud button{background:var(--glass);border:1px solid var(--line);color:var(--ink);
+    font-family:'Jost',sans-serif;font-weight:300;font-size:13px;padding:10px 22px;
+    border-radius:30px;cursor:pointer;backdrop-filter:blur(12px);
+    letter-spacing:.14em;text-transform:uppercase;
+    transition:border-color .3s,color .3s,transform .2s,box-shadow .3s;}
+  .hud button:hover{border-color:var(--accent);color:var(--accent);
+    transform:translateY(-1px);box-shadow:0 8px 28px #eec87a22;}
+  #badge{position:relative}
+  #badge .n{position:absolute;top:-6px;right:-2px;background:var(--accent);
+    color:#181206;font-size:10px;min-width:18px;height:18px;line-height:18px;
+    border-radius:9px;text-align:center;font-weight:500;display:none;
+    box-shadow:0 2px 8px #eec87a55;}
+
+  .panel{position:fixed;z-index:1001;left:50%;top:50%;
+    transform:translate(-50%,-48%) scale(.97);width:min(500px,92vw);
+    background:linear-gradient(160deg,#10202fd9,#0a1622e8);
+    backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:20px;
+    padding:34px 34px 30px;display:none;opacity:0;
+    box-shadow:0 40px 90px rgba(0,0,0,.6), inset 0 1px 0 #ffffff12;}
+  .panel.open{display:block;animation:rise .45s cubic-bezier(.2,.9,.3,1.05) forwards}
+  @keyframes rise{to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+  .panel h2{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:26px;
+    letter-spacing:.03em;margin-bottom:6px;color:#f4efe4}
+  .panel p.sub{color:var(--dim);font-size:13.5px;margin-bottom:18px;
+    font-family:'Cormorant Garamond',serif;font-style:italic;font-size:16px}
+  textarea{width:100%;height:130px;background:#081220cc;border:1px solid var(--line);
+    color:var(--ink);font-family:'Cormorant Garamond',serif;font-size:18px;
+    line-height:1.7;padding:16px;border-radius:12px;resize:none;
+    transition:border-color .3s, box-shadow .3s;}
+  textarea::placeholder{color:#5c7386;font-style:italic}
+  textarea:focus{outline:none;border-color:var(--accent-soft);
+    box-shadow:0 0 0 3px #eec87a1c, 0 0 30px #eec87a14;}
+  .row{display:flex;gap:12px;margin-top:16px;align-items:center}
+  select{flex:1;background:#081220cc;color:var(--ink);border:1px solid var(--line);
+    padding:11px 12px;border-radius:10px;font-family:'Jost',sans-serif;
+    font-weight:300;font-size:13px;letter-spacing:.06em;}
+  select:focus{outline:none;border-color:var(--accent-soft)}
+  .btn{background:linear-gradient(160deg,#f4d68d,#dfb25e);color:#1c1405;border:none;
+    padding:12px 26px;border-radius:28px;font-family:'Jost',sans-serif;
+    font-weight:400;font-size:13px;cursor:pointer;letter-spacing:.14em;
+    text-transform:uppercase;
+    transition:transform .2s,box-shadow .3s;}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 10px 30px #eec87a33}
+  .btn.ghost{background:transparent;color:var(--dim);border:1px solid var(--line)}
+  .btn.ghost:hover{color:var(--ink);box-shadow:none;border-color:#3a5670}
+  .btn:disabled{opacity:.45;cursor:default}
+
+  /* ---------- shore cards & misc ---------- */
+  .close-x{transition:color .2s}
+  .close-x:hover{color:var(--accent)!important}
+  #shoreList::-webkit-scrollbar{width:5px}
+  #shoreList::-webkit-scrollbar-thumb{background:#2b4358;border-radius:3px}
+  #toast em{color:var(--accent);font-style:normal}
+
+  /* ---------- bottle bobbing ---------- */
+  .bottle-ico,.mine-ico{animation:bob 3.4s ease-in-out infinite}
+  .mine-ico{animation-delay:-1.7s;animation-duration:4.1s}
+  @keyframes bob{
+    0%,100%{margin-top:0;filter:drop-shadow(0 0 5px #eec87a44)}
+    50%{margin-top:-5px;filter:drop-shadow(0 6px 9px #00000088)}
+  }
+  .leaflet-tooltip{background:#0d1a28ee!important;border:1px solid var(--line)!important;
+    color:var(--ink)!important;font-family:'Jost',sans-serif;font-weight:300!important;
+    letter-spacing:.08em;border-radius:8px!important;box-shadow:none!important;
+    font-size:12px!important;}
+  .leaflet-tooltip-top:before{display:none}
+  .leaflet-bar{border:none!important;box-shadow:none!important}
+  .leaflet-bar a{background:#0d1a28e6!important;color:#e6eef4!important;
+    border:1px solid #1f3547!important;font-family:'Jost',sans-serif!important;
+    font-weight:300!important;backdrop-filter:blur(8px);margin-bottom:6px;
+    border-radius:10px!important;transition:border-color .25s,color .25s;}
+  .leaflet-bar a:hover{border-color:#eec87a!important;color:#eec87a!important}
+
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<header>
+  <div class="brand">
+    <h1>Message <span>in a</span> Bottle</h1>
+    <p>let the tide decide</p>
+  </div>
+  <div class="hud">
+    <button id="castBtn">Cast a bottle</button>
+    <button id="shoreBtn">The Shore<span class="n" id="badge"><span class="n" id="badgeN">0</span></span></button>
+  </div>
+</header>
+
+<div id="vignette"></div>
+<div id="grain"></div>
+
+<div id="legend" style="position:fixed;bottom:22px;left:24px;z-index:900;font-size:11px;color:#8ba3b3;line-height:2;letter-spacing:.1em;background:#0a152099;padding:12px 18px;border-radius:14px;backdrop-filter:blur(10px);border:1px solid #1f3547;">
+  <b><span style="color:#eec87a;font-size:14px">●</span> drifting bottle</b> — riding the currents<br>
+  <b><span style="color:#84d9c6;font-size:14px">●</span> your bottle</b> — still at sea<br>
+  <b><span style="color:#d8c9a8;font-size:14px">◗</span> shell</b> — where yours came ashore
+</div>
+
+<!-- COMPOSE -->
+<div class="panel" id="compose">
+  <span class="close-x" data-close="compose" style="float:right;cursor:pointer;color:#7f95a3;padding:0 4px">✕</span>
+  <h2>Cast your message to the sea</h2>
+  <p class="sub">It may drift for days… or months. It will reach whoever the tide decides.</p>
+  <textarea id="msgText" maxlength="280" placeholder="Dear stranger, …"></textarea>
+  <div class="row">
+    <select id="launchSpot"></select>
+    <button class="btn" id="sendBtn">Cast</button>
+  </div>
+  <p class="sub" id="etaLine" style="margin-top:12px;margin-bottom:0"></p>
+</div>
+
+<!-- SHORE -->
+<div class="panel" id="shore">
+  <span class="close-x" data-close="shore" style="float:right;cursor:pointer;color:#7f95a3;padding:0 4px">✕</span>
+  <h2>The Shore</h2>
+  <p class="sub">Bottles the tide has brought you.</p>
+  <div id="shoreList" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:10px"></div>
+</div>
+
+<!-- READ -->
+<div class="panel" id="read">
+  <span class="close-x" data-close="read" style="float:right;cursor:pointer;color:#7f95a3;padding:0 4px">✕</span>
+  <h2>A bottle, unstoppered</h2>
+  <p class="sub" id="readMeta"></p>
+  <div id="readBody" style="font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.85;white-space:pre-wrap;color:#efe9db"></div>
+  <div class="row"><button class="btn ghost" id="tossBtn">Toss it back into the sea</button></div>
+</div>
+
+<div id="toast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(90px);background:#0d1a28f2;border:1px solid #eec87a55;color:#e6eef4;font-family:'Jost',sans-serif;font-weight:300;padding:13px 26px;border-radius:32px;z-index:1002;font-size:14px;letter-spacing:.06em;backdrop-filter:blur(12px);box-shadow:0 18px 50px rgba(0,0,0,.55);transition:transform .45s cubic-bezier(.2,.9,.3,1.15);white-space:nowrap;"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* =====================================================================
+   MESSAGE IN A BOTTLE — prototype
+   Time scale: DEMO_SPEED simulated hours per real second (3 days/sec).
+   Bottles ride a procedural ocean-current field toward a drift target.
+===================================================================== */
+const DEMO_SPEED = 72;
+
+/* ---------- map ---------- */
+const map = L.map('map',{center:[18,-40],zoom:3,minZoom:2,maxZoom:7,
+  worldCopyJump:true, attributionControl:false, zoomControl:false});
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+/* ---------- procedural current field ---------- */
+function hash(n){ n=Math.sin(n)*43758.5453; return n-Math.floor(n); }
+function noise(x,y){
+  const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
+  const u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
+  const a=hash(xi+yi*57), b=hash(xi+1+yi*57),
+        c=hash(xi+(yi+1)*57), d=hash(xi+1+(yi+1)*57);
+  return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;
+}
+function currentAt(lat,lon){
+  const g = Math.sin(lon*Math.PI/90)*Math.cos(lat*Math.PI/60);
+  const n1 = noise(lon*.04+7,lat*.04+3)-.5;
+  const n2 = noise(lon*.09+31,lat*.09+13)-.5;
+  let vx = -g*.55 + n1*1.1 + n2*.5;
+  let vy =  g*.35 + n2*.9 - n1*.3;
+  if(Math.abs(lat)>68){vx*=.2;vy*=.2;}
+  return {vx,vy};
+}
+
+/* ---------- state ---------- */
+let myBottles = JSON.parse(localStorage.getItem('mib_mine')||'[]');
+let shore     = JSON.parse(localStorage.getItem('mib_shore')||'[]');
+const markers = new Map();
+
+const LAUNCH_SPOTS=[
+  {name:'Cape Cod, USA',        lat:41.9, lon:-70.0},
+  {name:'Lisbon, Portugal',     lat:38.7, lon:-9.1},
+  {name:'Sydney, Australia',    lat:-33.9,lon:151.2},
+  {name:'Cape Town, S. Africa', lat:-34.0,lon:18.4},
+  {name:'Rio de Janeiro',       lat:-23.0,lon:-43.2},
+  {name:'Tokyo, Japan',         lat:35.6, lon:139.7},
+];
+const STRANGER_NAMES=['a lighthouse keeper','Mara, 71','someone on a ferry',
+ 'a night-shift nurse','J., somewhere warm','a retired sailor',
+ 'an insomniac poet','the kid from seat 14A'];
+const SEED_SHORE=[
+ {id:'s1',seed:true,text:"I threw this from the ferry to Nantucket because I was too scared to send the actual text. If you're reading this: say the thing. Whatever it is.",from:'a nervous passenger',days:214},
+ {id:'s2',seed:true,text:"Day 40 of my sailing trip. Today a whale surfaced next to the boat for ten full minutes and nobody said a word. That's all. Carry on.",from:'someone mid-ocean',days:33},
+ {id:'s3',seed:true,text:"To whoever finds this: my grandmother told me never to put anything in writing I wouldn't read aloud. So now I only write in bottles.",from:'Mara, 71',days:96},
+];
+const WASH_TEXTS=[
+ "Does anyone else feel like the internet got too fast? Anyway. Hello from a train somewhere in Norway.",
+ "I quit my job last Tuesday. This bottle felt safer than telling my mother.",
+ "If you find this: today was a good day. Small things. Coffee. Sunlight. A dog I didn't know.",
+ "Writing this during a blackout. Candles are overrated; silence isn't.",
+ "You are exactly on time for your own life.",
+];
+
+/* ---------- helpers ---------- */
+function save(){
+  localStorage.setItem('mib_mine',JSON.stringify(myBottles));
+  localStorage.setItem('mib_shore',JSON.stringify(shore));
+}
+function fmtDays(h){const d=h/24;
+  if(d<1)return'less than a day';if(d<2)return'about a day';
+  return`about ${Math.round(d)} days`;}
+function toast(html){
+  const t=document.getElementById('toast');
+  t.innerHTML=html;t.classList.add('show');
+  clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),4200);
+}
+document.querySelectorAll('.close-x').forEach(x=>
+  x.onclick=()=>document.getElementById(x.dataset.close).classList.remove('open'));
+
+/* ---------- icons ---------- */
+const svg=c=>`<svg width="26" height="26" viewBox="0 0 26 26">
+  <ellipse cx="13" cy="24" rx="6" ry="1.4" fill="#00000055"/>
+  <circle cx="13" cy="16" r="7" fill="${c}" opacity=".9"/>
+  <circle cx="10.5" cy="13.5" r="2" fill="#ffffff" opacity=".35"/>
+  <path d="M11 9 h4 v-3.5 q0-1 1-1 h0.5" stroke="${c}" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+  <rect x="12.8" y="2.6" width="4.4" height="2.6" rx="1.1" fill="#a98d54"/>
+</svg>`;
+const ICO_DRIFT=L.divIcon({className:'bottle-ico',html:svg('#eec87a'),iconSize:[26,26],iconAnchor:[13,13]});
+const ICO_MINE =L.divIcon({className:'mine-ico', html:svg('#84d9c6'),iconSize:[26,26],iconAnchor:[13,13]});
+const ICO_SHELL=L.divIcon({html:`<svg width="20" height="20" viewBox="0 0 20 20">
+  <path d="M10 17 C4 17 2 12 2.5 8 C5 10 7 10.5 10 10.5 C13 10.5 15 10 17.5 8 C18 12 16 17 10 17 Z"
+        fill="#d8c9a8" stroke="#a8987a" stroke-width=".8"/>
+  <path d="M10 10.5 V17 M6.5 11.2 L7.5 16.4 M13.5 11.2 L12.5 16.4"
+        stroke="#a8987a" stroke-width=".7" fill="none"/>
+</svg>`,iconSize:[20,20],iconAnchor:[10,10]});
+
+/* ---------- simulation ---------- */
+function updateMarker(b){
+  let m=markers.get(b.id);
+  if(!m){
+    m=L.marker([b.lat,b.lon],{icon:b.mine?ICO_MINE:ICO_DRIFT}).addTo(map)
+      .bindTooltip(b.mine?'your bottle':"a stranger's bottle",{direction:'top'});
+    markers.set(b.id,m);
+  }
+  m.setLatLng([b.lat,b.lon]);
+}
+function arrive(b){
+  b.arrivedAt=Date.now();
+  if(markers.has(b.id)){map.removeLayer(markers.get(b.id));markers.delete(b.id);}
+  L.marker([b.lat,b.lon],{icon:ICO_SHELL}).addTo(map).bindPopup(
+    `<i>Your bottle washed ashore after ${fmtDays(b.simElapsed)}.<br>Whoever finds it will write back… someday.</i>`);
+  toast(`Your bottle reached a shore after <em>${fmtDays(b.simElapsed)}</em>.`);
+  save();
+}
+function step(dtSimHours){
+  for(const b of myBottles){
+    if(b.arrivedAt)continue;
+    b.simElapsed+=dtSimHours;
+    const c=currentAt(b.lat,b.lon);
+    let vx=c.vx,vy=c.vy;
+    const dLat=b.tlat-b.lat,dLon=b.tlon-b.lon;
+    const dist=Math.hypot(dLon,dLat)+1e-9;
+    vx+=dLon/dist*.25; vy+=dLat/dist*.25;
+    b.lat+=vy*.06*dtSimHours/Math.max(1,dist/8);
+    b.lon+=vx*.06*dtSimHours/Math.max(1,dist/8);
+    b.lon=((b.lon+180)%360+360)%360-180;
+    if(dist<.8||b.simElapsed>b.maxHours)arrive(b);else updateMarker(b);
+  }
+}
+
+/* ---------- casting ---------- */
+const sel=document.getElementById('launchSpot');
+LAUNCH_SPOTS.forEach((s,i)=>sel.add(new Option(s.name,i)));
+document.getElementById('castBtn').onclick=()=>
+  document.getElementById('compose').classList.add('open');
+document.getElementById('sendBtn').onclick=()=>{
+  const txt=document.getElementById('msgText').value.trim();
+  if(!txt){toast('Write something first.');return;}
+  const s=LAUNCH_SPOTS[+sel.value];
+  const t={lat:Math.random()*70-35,
+           lon:s.lon+(Math.random()*160+80)*(Math.random()<.5?-1:1)};
+  const b={id:'m'+Date.now(),text:txt,lat:s.lat,lon:s.lon,
+    tlat:t.lat,tlon:t.lon,simElapsed:0,
+    maxHours:24*(30+Math.random()*300),mine:true};
+  myBottles.push(b);updateMarker(b);save();
+  document.getElementById('msgText').value='';
+  document.getElementById('compose').classList.remove('open');
+  map.flyTo([s.lat,s.lon],4,{duration:2});
+  toast('Cast! Your bottle rides the tide now.');
+};
+
+/* ---------- shore ---------- */
+function refreshShore(){
+  const list=document.getElementById('shoreList');list.innerHTML='';
+  SEED_SHORE.concat(shore).forEach(sb=>{
+    const d=document.createElement('div');
+    d.style.cssText='border:1px solid #1f3547;border-radius:14px;padding:16px 18px;cursor:pointer;background:#08122066;transition:border-color .25s, transform .2s';
+    d.onmouseenter=()=>{d.style.borderColor='#eec87a88';d.style.transform='translateY(-1px)';};
+    d.onmouseleave=()=>{d.style.borderColor='#1f3547';d.style.transform='none';};
+    d.innerHTML=`<div style="font-size:11px;color:#8ba3b3;font-family:'Jost',sans-serif;font-weight:300;letter-spacing:.12em;text-transform:uppercase">from ${sb.from} · adrift ${sb.days||fmtDays(sb.simElapsed||0)}</div>
+      <div style="margin-top:8px;font-size:17px;font-family:'Cormorant Garamond',serif;line-height:1.5">${sb.text.slice(0,90)}${sb.text.length>90?'…':''}</div>`;
+    d.onclick=()=>{
+      document.getElementById('readMeta').textContent=
+        `Found on your shore · set adrift by ${sb.from}`;
+      document.getElementById('readBody').textContent=sb.text;
+      document.getElementById('tossBtn').style.display=sb.seed?'none':'';
+      document.getElementById('tossBtn')._target=sb;
+      document.getElementById('read').classList.add('open');
+    };
+    list.appendChild(d);
+  });
+  const n=document.getElementById('badgeN');
+  const total=SEED_SHORE.length+shore.length;
+  n.textContent=total;n.style.display=total?'block':'none';
+}
+document.getElementById('shoreBtn').onclick=()=>{
+  refreshShore();document.getElementById('shore').classList.add('open');
+};
+
+/* stranger bottles randomly wash up */
+setInterval(()=>{
+  if(Math.random()<.28 && shore.length<9){
+    shore.push({id:'w'+Date.now(),
+      text:WASH_TEXTS[Math.floor(Math.random()*WASH_TEXTS.length)],
+      from:STRANGER_NAMES[Math.floor(Math.random()*STRANGER_NAMES.length)],
+      days:Math.round(20+Math.random()*400)});
+    save();refreshShore();
+    toast('A new bottle just <em>washed ashore</em>.');
+  }
+},25000);
+
+/* toss back */
+document.getElementById('tossBtn').onclick=function(){
+  const sb=this._target;if(!sb)return;
+  shore=shore.filter(b=>b!==sb);save();
+  document.getElementById('read').classList.remove('open');
+  refreshShore();
+  toast('Tossed back into the sea. Bon voyage.');
+};
+
+/* ---------- boot ---------- */
+myBottles.forEach(updateMarker);
+refreshShore();
+let last=performance.now();
+(function loop(t){
+  const dt=Math.min(.25,(t-last)/1000);last=t;
+  step(dt*DEMO_SPEED);
+  requestAnimationFrame(loop);
+})(last);
+toast('Welcome to the sea. Cast a bottle, or check <em>The Shore</em>');
+
+
+</script>
+
+
+</body>
+</html>
