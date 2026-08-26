@@ -21,7 +21,7 @@
   ::selection{background:#eec87a44;color:#fff}
 
   #map{position:fixed;inset:0;background:#06101a}
-  .leaflet-tile-pane{filter:saturate(.45) brightness(.62) contrast(1.05)}
+  .leaflet-tile-pane{filter:saturate(.55) brightness(.72) contrast(1.05) hue-rotate(-8deg)}
   .leaflet-container{font-family:'Jost',sans-serif}
 
   /* ---------- cinematic overlays ---------- */
@@ -38,7 +38,8 @@
   header{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;
     align-items:flex-start;justify-content:space-between;padding:22px 28px;
     pointer-events:none;}
-  .brand h1{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:500;
+  .brand h1{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:500;
+    white-space:nowrap;
     letter-spacing:.16em;text-transform:uppercase;color:#f2ede1;
     text-shadow:0 2px 24px rgba(0,0,0,.8);}
   .brand h1 span{color:var(--accent);font-style:italic;text-transform:none;
@@ -46,9 +47,10 @@
   .brand p{font-size:11px;letter-spacing:.34em;text-transform:uppercase;
     color:var(--dim);margin-top:2px;padding-left:.34em;}
 
-  .hud{display:flex;gap:12px;pointer-events:auto;margin-top:6px}
+  .hud{display:flex;gap:12px;pointer-events:auto;margin-top:6px;flex-wrap:nowrap}
+  .hud button,.hud #coinBadge{white-space:nowrap}
   .hud button{background:var(--glass);border:1px solid var(--line);color:var(--ink);
-    font-family:'Jost',sans-serif;font-weight:300;font-size:13px;padding:10px 22px;
+    font-family:'Jost',sans-serif;font-weight:300;font-size:12px;padding:10px 18px;
     border-radius:30px;cursor:pointer;backdrop-filter:blur(12px);
     letter-spacing:.14em;text-transform:uppercase;
     transition:border-color .3s,color .3s,transform .2s,box-shadow .3s;}
@@ -97,6 +99,17 @@
   /* ---------- shore cards & misc ---------- */
   .close-x{transition:color .2s}
   .close-x:hover{color:var(--accent)!important}
+  #coinBadge{display:flex;align-items:center;gap:8px;background:var(--glass);
+    border:1px solid var(--line);border-radius:30px;padding:10px 18px;
+    font-size:13px;letter-spacing:.08em;backdrop-filter:blur(12px);}
+  #coinBadge b{color:var(--accent);font-weight:500}
+  .cost-line{margin-top:12px;font-size:12px;color:var(--dim);
+    letter-spacing:.1em;text-transform:uppercase;font-family:'Jost',sans-serif}
+  .cost-line b{color:var(--accent);font-weight:500}
+  .home-chip{margin-top:14px;padding:11px 14px;border:1px dashed var(--line);
+    border-radius:10px;font-size:13px;color:var(--dim);letter-spacing:.06em;
+    font-family:'Jost',sans-serif}
+  .home-chip b{color:var(--ink);font-weight:400}
   #shoreList::-webkit-scrollbar{width:5px}
   #shoreList::-webkit-scrollbar-thumb{background:#2b4358;border-radius:3px}
   #toast em{color:var(--accent);font-style:normal}
@@ -131,10 +144,22 @@
     <p>let the tide decide</p>
   </div>
   <div class="hud">
+    <div id="coinBadge">◍ <b id="coinN">0</b>&nbsp;doubloons</div>
     <button id="castBtn">Cast a bottle</button>
-    <button id="shoreBtn">The Shore<span class="n" id="badge"><span class="n" id="badgeN">0</span></span></button>
+    <button id="shoreBtn">Inbox<span class="n" id="badge"><span class="n" id="badgeN">0</span></span></button>
   </div>
 </header>
+
+<!-- HOME SHORE SELECT -->
+<div class="panel" id="homePanel">
+  <h2>Choose your shore</h2>
+  <p class="sub">This is where you live now. Your bottles cast off from here —
+  and the tide will only carry them along the world's coastlines.</p>
+  <select id="homeSpot" style="width:100%"></select>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn" id="homeBtn">Settle here</button>
+  </div>
+</div>
 
 <div id="vignette"></div>
 <div id="grain"></div>
@@ -151,10 +176,11 @@
   <h2>Cast your message to the sea</h2>
   <p class="sub">It may drift for days… or months. It will reach whoever the tide decides.</p>
   <textarea id="msgText" maxlength="280" placeholder="Dear stranger, …"></textarea>
-  <div class="row">
-    <select id="launchSpot"></select>
+  <div class="home-chip" id="homeChip"></div>
+  <div class="row" style="justify-content:flex-end">
     <button class="btn" id="sendBtn">Cast</button>
   </div>
+  <p class="cost-line" id="costLine"></p>
   <p class="sub" id="etaLine" style="margin-top:12px;margin-bottom:0"></p>
 </div>
 
@@ -189,7 +215,7 @@ const DEMO_SPEED = 72;
 const map = L.map('map',{center:[18,-40],zoom:3,minZoom:2,maxZoom:7,
   worldCopyJump:true, attributionControl:false, zoomControl:false});
 L.control.zoom({position:'bottomright'}).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:7}).addTo(map);
 
 /* ---------- procedural current field ---------- */
 function hash(n){ n=Math.sin(n)*43758.5453; return n-Math.floor(n); }
@@ -213,15 +239,54 @@ function currentAt(lat,lon){
 /* ---------- state ---------- */
 let myBottles = JSON.parse(localStorage.getItem('mib_mine')||'[]');
 let shore     = JSON.parse(localStorage.getItem('mib_shore')||'[]');
+let coins     = parseInt(localStorage.getItem('mib_coins')||'0',10);
+let freeUsed  = localStorage.getItem('mib_free')==='1';
+let home      = JSON.parse(localStorage.getItem('mib_home')||'null');
 const markers = new Map();
 
-const LAUNCH_SPOTS=[
-  {name:'Cape Cod, USA',        lat:41.9, lon:-70.0},
-  {name:'Lisbon, Portugal',     lat:38.7, lon:-9.1},
-  {name:'Sydney, Australia',    lat:-33.9,lon:151.2},
-  {name:'Cape Town, S. Africa', lat:-34.0,lon:18.4},
-  {name:'Rio de Janeiro',       lat:-23.0,lon:-43.2},
-  {name:'Tokyo, Japan',         lat:35.6, lon:139.7},
+const BOTTLE_COST = 10;
+const EARN_ARRIVE = 15, EARN_WASH = 5, EARN_READ = 3;
+
+/* home shores — where players live */
+const COAST_HOMES=[
+  {name:'Provincetown, Cape Cod',  lat:42.05, lon:-70.18},
+  {name:'Lisbon, Portugal',        lat:38.71, lon:-9.14},
+  {name:'Sydney, Australia',       lat:-33.86,lon:151.20},
+  {name:'Cape Town, S. Africa',    lat:-33.91,lon:18.42},
+  {name:'Rio de Janeiro, Brazil',  lat:-22.95,lon:-43.16},
+  {name:'Kamakura, Japan',         lat:35.31, lon:139.55},
+  {name:'Biarritz, France',        lat:43.48, lon:-1.56},
+  {name:'Zanzibar, Tanzania',      lat:-6.16, lon:39.19},
+  {name:'Vancouver, Canada',       lat:49.28, lon:-123.11},
+  {name:'Valparaíso, Chile',       lat:-33.05,lon:-71.62},
+];
+
+/* coastal waypoints — bottles hop along these, never lost at sea */
+const WAYPOINTS=[
+  [41.5,-70.0],[40.5,-73.9],[38.9,-74.9],[35.0,-75.5],[32.0,-80.8],[25.8,-80.1],
+  [23.0,-82.5],[18.5,-77.5],[9.5,-79.5],[10.5,-61.5],[14.5,-61.0],[18.5,-69.9],
+  [23.1,-82.4],[21.5,-87.0],[18.5,-88.3],[15.5,-88.8],[9.0,-79.5],[8.0,-77.4],
+  [10.7,-64.2],[12.0,-72.0],[-8.0,-34.9],[-13.0,-38.5],[-23.0,-43.2],[-27.5,-48.5],
+  [-34.6,-58.4],[-38.0,-57.5],[-41.0,-62.8],[-45.9,-67.5],[-53.2,-70.9],
+  [43.5,-1.6],[38.7,-9.1],[36.0,-5.6],[35.9,-5.9],[33.6,-7.6],[30.4,-9.6],
+  [21.5,-15.0],[14.7,-17.4],[9.5,-13.7],[4.6,-7.5],[-0.4,9.4],[-4.0,11.9],
+  [-6.2,12.2],[-15.0,12.1],[-22.9,14.5],[-33.9,18.4],[-34.8,20.0],[-29.9,31.0],
+  [-25.5,32.6],[-18.0,36.5],[-12.0,40.5],[-6.2,39.2],[-1.5,42.0],[4.0,44.5],
+  [12.8,44.9],[20.0,39.0],[28.0,34.0],[31.2,29.9],[36.5,28.2],[40.5,26.5],
+  [41.0,28.9],[45.5,13.7],[43.5,10.2],[40.5,17.9],[38.0,23.7],[36.5,28.0],
+  [52.5,4.5],[53.5,6.5],[57.0,10.5],[59.9,10.7],[55.5,12.9],[54.5,18.5],
+  [59.5,24.5],[60.0,29.0],[64.2,21.0],[66.0,14.5],[69.0,16.0],[71.0,25.5],
+  [35.3,139.5],[36.5,140.6],[38.3,141.0],[41.8,140.7],[43.1,141.3],[35.0,137.0],
+  [33.5,135.5],[31.5,130.5],[26.5,126.7],[22.3,114.1],[21.5,109.0],[16.0,108.2],
+  [10.5,106.7],[3.1,101.7],[1.3,103.8],[-6.2,106.8],[-7.8,110.4],[-8.6,115.2],
+  [-10.2,123.6],[-12.5,130.8],[-17.0,145.9],[-20.3,148.8],[-25.0,153.1],
+  [-29.5,153.4],[-33.9,151.2],[-35.0,147.4],[-38.3,144.9],[-41.5,147.2],
+  [-45.0,170.7],[-46.4,168.3],[-36.9,174.8],[-39.5,176.8],[-45.9,170.5],
+  [49.3,-123.1],[47.6,-122.3],[45.5,-122.6],[42.6,-124.4],[38.4,-123.0],
+  [36.6,-121.9],[33.9,-118.4],[32.7,-117.2],[31.0,-113.5],[27.9,-110.9],
+  [24.1,-110.3],[20.6,-105.2],[16.8,-99.9],[19.0,-96.1],[21.2,-86.8],
+  [-12.1,-77.0],[-16.5,-72.6],[-23.9,-70.4],[-30.0,-71.3],[-33.0,-71.6],
+  [-37.0,-73.1],[-41.7,-73.2],[-45.5,-72.1],[-49.8,-73.4],
 ];
 const STRANGER_NAMES=['a lighthouse keeper','Mara, 71','someone on a ferry',
  'a night-shift nurse','J., somewhere warm','a retired sailor',
@@ -243,7 +308,10 @@ const WASH_TEXTS=[
 function save(){
   localStorage.setItem('mib_mine',JSON.stringify(myBottles));
   localStorage.setItem('mib_shore',JSON.stringify(shore));
+  localStorage.setItem('mib_coins',String(coins));
+  localStorage.setItem('mib_free',freeUsed?'1':'0');
 }
+function refreshCoins(){document.getElementById('coinN').textContent=coins;}
 function fmtDays(h){const d=h/24;
   if(d<1)return'less than a day';if(d<2)return'about a day';
   return`about ${Math.round(d)} days`;}
@@ -287,44 +355,80 @@ function arrive(b){
   if(markers.has(b.id)){map.removeLayer(markers.get(b.id));markers.delete(b.id);}
   L.marker([b.lat,b.lon],{icon:ICO_SHELL}).addTo(map).bindPopup(
     `<i>Your bottle washed ashore after ${fmtDays(b.simElapsed)}.<br>Whoever finds it will write back… someday.</i>`);
-  toast(`Your bottle reached a shore after <em>${fmtDays(b.simElapsed)}</em>.`);
+  coins+=EARN_ARRIVE;save();refreshCoins();
+  toast(`Your bottle reached a shore after <em>${fmtDays(b.simElapsed)}</em> — <em>+${EARN_ARRIVE} doubloons</em>.`);
   save();
+}
+/* nearest coastal waypoint */
+function nearestWP(lat,lon,exclude){
+  let best=null,bd=1e9;
+  for(const w of WAYPOINTS){
+    const d=Math.hypot(w[0]-lat,w[1]-lon);
+    if(d<bd && !(exclude && w===exclude)){bd=d;best=w;}
+  }
+  return {wp:best,d:bd};
 }
 function step(dtSimHours){
   for(const b of myBottles){
     if(b.arrivedAt)continue;
     b.simElapsed+=dtSimHours;
+    // aim for the nearest coastal waypoint; re-aim if we stray too far
+    if(!b.wp) b.wp=nearestWP(b.lat,b.lon).wp;
+    let dist=Math.hypot(b.wp[0]-b.lat,b.wp[1]-b.lon);
+    if(dist>20){ b.wp=nearestWP(b.lat,b.lon).wp; dist=Math.hypot(b.wp[0]-b.lat,b.wp[1]-b.lon); }
+    if(b.simElapsed>b.maxHours){          // time's up: come ashore at the nearest coast
+      b.lat=b.wp[0]; b.lon=b.wp[1]; arrive(b); continue;
+    }
     const c=currentAt(b.lat,b.lon);
     let vx=c.vx,vy=c.vy;
-    const dLat=b.tlat-b.lat,dLon=b.tlon-b.lon;
-    const dist=Math.hypot(dLon,dLat)+1e-9;
-    vx+=dLon/dist*.25; vy+=dLat/dist*.25;
+    const dLat=b.wp[0]-b.lat,dLon=b.wp[1]-b.lon;
+    vx+=dLon/dist*.4; vy+=dLat/dist*.4;   // strong coastal pull
     b.lat+=vy*.06*dtSimHours/Math.max(1,dist/8);
     b.lon+=vx*.06*dtSimHours/Math.max(1,dist/8);
     b.lon=((b.lon+180)%360+360)%360-180;
-    if(dist<.8||b.simElapsed>b.maxHours)arrive(b);else updateMarker(b);
+    if(dist<1.2){                          // reached this stretch of coast
+      b.wp=nearestWP(b.lat,b.lon,b.wp).wp; // hop to the next one
+    }
+    updateMarker(b);
   }
 }
 
 /* ---------- casting ---------- */
-const sel=document.getElementById('launchSpot');
-LAUNCH_SPOTS.forEach((s,i)=>sel.add(new Option(s.name,i)));
-document.getElementById('castBtn').onclick=()=>
+function costLineText(){
+  const el=document.getElementById('costLine');
+  el.innerHTML=freeUsed
+    ? `a bottle costs <b>${BOTTLE_COST} doubloons</b> · you have <b>${coins}</b>`
+    : `<b>your first bottle is free</b>`;
+}
+function refreshHomeChip(){
+  document.getElementById('homeChip').innerHTML=
+    home?`Casting off from <b>${home.name}</b> — your bottle will hug the coastline.`
+        :'Choose a shore first.';
+}
+document.getElementById('castBtn').onclick=()=>{
+  if(!home){openHome();return;}
+  refreshHomeChip();costLineText();
   document.getElementById('compose').classList.add('open');
+};
 document.getElementById('sendBtn').onclick=()=>{
   const txt=document.getElementById('msgText').value.trim();
   if(!txt){toast('Write something first.');return;}
-  const s=LAUNCH_SPOTS[+sel.value];
-  const t={lat:Math.random()*70-35,
-           lon:s.lon+(Math.random()*160+80)*(Math.random()<.5?-1:1)};
-  const b={id:'m'+Date.now(),text:txt,lat:s.lat,lon:s.lon,
-    tlat:t.lat,tlon:t.lon,simElapsed:0,
-    maxHours:24*(30+Math.random()*300),mine:true};
+  if(!home){toast('Choose your shore first.');openHome();return;}
+  if(freeUsed && coins<BOTTLE_COST){
+    toast(`Not enough doubloons — a bottle costs <em>${BOTTLE_COST}</em>. Read bottles or wait for yours to land.`);
+    return;
+  }
+  if(freeUsed){coins-=BOTTLE_COST;}else{freeUsed=true;}
+  save();refreshCoins();
+  const t=nearestWP(home.lat,home.lon).wp;   // first stretch of coast from home
+  const b={id:'m'+Date.now(),text:txt,lat:home.lat,lon:home.lon,
+    simElapsed:0,maxHours:24*(30+Math.random()*300),mine:true,wp:t};
   myBottles.push(b);updateMarker(b);save();
   document.getElementById('msgText').value='';
   document.getElementById('compose').classList.remove('open');
-  map.flyTo([s.lat,s.lon],4,{duration:2});
-  toast('Cast! Your bottle rides the tide now.');
+  map.flyTo([home.lat,home.lon],4,{duration:2});
+  costLineText();
+  toast('Cast. Your bottle rides the tide now.');
 };
 
 /* ---------- shore ---------- */
@@ -344,6 +448,8 @@ function refreshShore(){
       document.getElementById('tossBtn').style.display=sb.seed?'none':'';
       document.getElementById('tossBtn')._target=sb;
       document.getElementById('read').classList.add('open');
+      if(!sb.paid){sb.paid=true;coins+=EARN_READ;save();refreshCoins();
+        toast(`<em>+${EARN_READ} doubloons</em> for reading a stranger's words.`);}
     };
     list.appendChild(d);
   });
@@ -362,8 +468,8 @@ setInterval(()=>{
       text:WASH_TEXTS[Math.floor(Math.random()*WASH_TEXTS.length)],
       from:STRANGER_NAMES[Math.floor(Math.random()*STRANGER_NAMES.length)],
       days:Math.round(20+Math.random()*400)});
-    save();refreshShore();
-    toast('A new bottle just <em>washed ashore</em>.');
+    coins+=EARN_WASH;save();refreshCoins();refreshShore();
+    toast(`A new bottle just <em>washed ashore</em> — <em>+${EARN_WASH} doubloons</em>.`);
   }
 },25000);
 
@@ -376,7 +482,39 @@ document.getElementById('tossBtn').onclick=function(){
   toast('Tossed back into the sea. Bon voyage.');
 };
 
+/* ---------- home shore ---------- */
+function openHome(){
+  const s=document.getElementById('homeSpot');
+  if(!s.options.length)
+    COAST_HOMES.forEach((h,i)=>s.add(new Option(h.name,i)));
+  document.getElementById('homePanel').classList.add('open');
+}
+document.getElementById('homeBtn').onclick=()=>{
+  home=COAST_HOMES[+document.getElementById('homeSpot').value];
+  localStorage.setItem('mib_home',JSON.stringify(home));save();
+  document.getElementById('homePanel').classList.remove('open');
+  drawHome();
+  map.flyTo([home.lat,home.lon],5,{duration:2});
+  toast(`You settle on the shore of <em>${home.name}</em>. Your first bottle is free.`);
+};
+let homeMarker=null;
+function drawHome(){
+  if(homeMarker)map.removeLayer(homeMarker);
+  if(!home)return;
+  homeMarker=L.marker([home.lat,home.lon],{icon:L.divIcon({className:'',
+    html:`<svg width="22" height="22" viewBox="0 0 22 22">
+      <circle cx="11" cy="4.5" r="2.4" fill="none" stroke="#eec87a" stroke-width="1.6"/>
+      <line x1="11" y1="7" x2="11" y2="17" stroke="#eec87a" stroke-width="1.6"/>
+      <line x1="7" y1="9.5" x2="15" y2="9.5" stroke="#eec87a" stroke-width="1.4"/>
+      <path d="M4.5 13 Q6 18 11 18.5 Q16 18 17.5 13" fill="none" stroke="#eec87a" stroke-width="1.6"/>
+    </svg>`,iconSize:[22,22],iconAnchor:[11,11]})}).addTo(map)
+    .bindTooltip('your shore',{direction:'top'});
+}
+
 /* ---------- boot ---------- */
+refreshCoins();
+drawHome();
+if(!home)openHome();
 myBottles.forEach(updateMarker);
 refreshShore();
 let last=performance.now();
@@ -385,7 +523,8 @@ let last=performance.now();
   step(dt*DEMO_SPEED);
   requestAnimationFrame(loop);
 })(last);
-toast('Welcome to the sea. Cast a bottle, or check <em>The Shore</em>');
+toast(home?'Welcome back to the sea. Cast a bottle, or check your <em>Inbox</em>'
+          :'Welcome, castaway. First — choose your shore.');
 
 
 </script>
