@@ -144,11 +144,50 @@
     <p>let the tide decide</p>
   </div>
   <div class="hud">
-    <div id="coinBadge">◍ <b id="coinN">0</b>&nbsp;doubloons</div>
+    <span id="userChip" style="display:none;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--line);border-radius:30px;padding:10px 18px;font-size:13px;letter-spacing:.08em;backdrop-filter:blur(12px);white-space:nowrap"></span>
+    <button id="logoutBtn" style="display:none">Log out</button>
+    <button id="shopBtn">Get bottles</button>
+    <div id="coinBadge"><b id="invN">0</b>&nbsp;bottles</div>
     <button id="castBtn">Cast a bottle</button>
     <button id="shoreBtn">Inbox<span class="n" id="badge"><span class="n" id="badgeN">0</span></span></button>
   </div>
 </header>
+
+<!-- ACCOUNT -->
+<div class="panel" id="authPanel">
+  <h2>Welcome ashore, castaway</h2>
+  <p class="sub">Create an account so your shore, your bottles, and your
+  letters are yours alone.</p>
+  <input id="authName" placeholder="your name" style="width:100%;background:#081220cc;border:1px solid var(--line);color:var(--ink);font-family:'Jost',sans-serif;font-weight:300;padding:12px;border-radius:10px;margin-bottom:10px;font-size:14px">
+  <input id="authEmail" placeholder="email" style="width:100%;background:#081220cc;border:1px solid var(--line);color:var(--ink);font-family:'Jost',sans-serif;font-weight:300;padding:12px;border-radius:10px;margin-bottom:10px;font-size:14px">
+  <input id="authPass" type="password" placeholder="password" style="width:100%;background:#081220cc;border:1px solid var(--line);color:var(--ink);font-family:'Jost',sans-serif;font-weight:300;padding:12px;border-radius:10px;margin-bottom:4px;font-size:14px">
+  <p class="cost-line" id="authMsg"></p>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn ghost" id="loginBtn">Log in</button>
+    <button class="btn" id="signupBtn">Sign up</button>
+  </div>
+</div>
+
+<!-- SHOP : THE CHANDLERY -->
+<div class="panel" id="shopPanel">
+  <span class="close-x" data-close="shopPanel" style="float:right;cursor:pointer;color:#7f95a3;padding:0 4px">✕</span>
+  <h2>The Chandlery</h2>
+  <p class="sub">Bottles for your voyages. Replies always sail free.</p>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="border:1px solid #1f3547;border-radius:14px;padding:18px;display:flex;justify-content:space-between;align-items:center;background:#08122066">
+      <div><b style="font-family:'Cormorant Garamond',serif;font-size:19px;color:#efe9db">One bottle</b>
+      <div style="font-size:12px;color:#8ba3b3;font-family:'Jost',sans-serif;letter-spacing:.08em;margin-top:3px">a single voyage into the unknown</div></div>
+      <button class="btn" id="buy1">$1.99</button>
+    </div>
+    <div style="border:1px solid #eec87a55;border-radius:14px;padding:18px;display:flex;justify-content:space-between;align-items:center;background:#eec87a0d">
+      <div><b style="font-family:'Cormorant Garamond',serif;font-size:19px;color:#efe9db">Five bottles</b>
+      <span style="background:#eec87a22;color:#eec87a;font-size:10px;padding:2px 8px;border-radius:8px;margin-left:8px;font-family:'Jost',sans-serif;letter-spacing:.1em">SAVE 60%</span>
+      <div style="font-size:12px;color:#8ba3b3;font-family:'Jost',sans-serif;letter-spacing:.08em;margin-top:3px">a whole flock of chances</div></div>
+      <button class="btn" id="buy5">$3.99</button>
+    </div>
+  </div>
+  <p class="cost-line" style="margin-top:14px">prototype checkout — no real charge</p>
+</div>
 
 <!-- HOME SHORE SELECT -->
 <div class="panel" id="homePanel">
@@ -173,8 +212,8 @@
 <!-- COMPOSE -->
 <div class="panel" id="compose">
   <span class="close-x" data-close="compose" style="float:right;cursor:pointer;color:#7f95a3;padding:0 4px">✕</span>
-  <h2>Cast your message to the sea</h2>
-  <p class="sub">It may drift for days… or months. It will reach whoever the tide decides.</p>
+  <h2 id="composeTitle">Cast your message to the sea</h2>
+  <p class="sub" id="composeSub">It may drift for days… or months. It will reach whoever the tide decides.</p>
   <textarea id="msgText" maxlength="280" placeholder="Dear stranger, …"></textarea>
   <div class="home-chip" id="homeChip"></div>
   <div class="row" style="justify-content:flex-end">
@@ -198,7 +237,10 @@
   <h2>A bottle, unstoppered</h2>
   <p class="sub" id="readMeta"></p>
   <div id="readBody" style="font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.85;white-space:pre-wrap;color:#efe9db"></div>
-  <div class="row"><button class="btn ghost" id="tossBtn">Toss it back into the sea</button></div>
+  <div class="row">
+    <button class="btn" id="replyBtn">Write back — free</button>
+    <button class="btn ghost" id="tossBtn">Toss it back into the sea</button>
+  </div>
 </div>
 
 <div id="toast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(90px);background:#0d1a28f2;border:1px solid #eec87a55;color:#e6eef4;font-family:'Jost',sans-serif;font-weight:300;padding:13px 26px;border-radius:32px;z-index:1002;font-size:14px;letter-spacing:.06em;backdrop-filter:blur(12px);box-shadow:0 18px 50px rgba(0,0,0,.55);transition:transform .45s cubic-bezier(.2,.9,.3,1.15);white-space:nowrap;"></div>
@@ -239,13 +281,14 @@ function currentAt(lat,lon){
 /* ---------- state ---------- */
 let myBottles = JSON.parse(localStorage.getItem('mib_mine')||'[]');
 let shore     = JSON.parse(localStorage.getItem('mib_shore')||'[]');
-let coins     = parseInt(localStorage.getItem('mib_coins')||'0',10);
-let freeUsed  = localStorage.getItem('mib_free')==='1';
+let inv       = parseInt(localStorage.getItem('mib_inv')||'0',10);
 let home      = JSON.parse(localStorage.getItem('mib_home')||'null');
+let user      = JSON.parse(localStorage.getItem('mib_user')||'null');
+let accounts  = JSON.parse(localStorage.getItem('mib_accounts')||'{}');
+let replyTo   = null;   // name of stranger we're answering (replies are free)
 const markers = new Map();
 
-const BOTTLE_COST = 10;
-const EARN_ARRIVE = 15, EARN_WASH = 5, EARN_READ = 3;
+const PACKS={one:{n:1,price:'$1.99'},five:{n:5,price:'$3.99'}};
 
 /* home shores — where players live */
 const COAST_HOMES=[
@@ -308,10 +351,71 @@ const WASH_TEXTS=[
 function save(){
   localStorage.setItem('mib_mine',JSON.stringify(myBottles));
   localStorage.setItem('mib_shore',JSON.stringify(shore));
-  localStorage.setItem('mib_coins',String(coins));
-  localStorage.setItem('mib_free',freeUsed?'1':'0');
+  localStorage.setItem('mib_inv',String(inv));
 }
-function refreshCoins(){document.getElementById('coinN').textContent=coins;}
+function refreshInv(){document.getElementById('invN').textContent=inv;}
+function refreshUser(){
+  const chip=document.getElementById('userChip'),
+        out=document.getElementById('logoutBtn');
+  if(user){chip.style.display='flex';out.style.display='';
+    chip.innerHTML=`◍ <b>${user.name}</b>`;}
+  else{chip.style.display='none';out.style.display='none';}
+}
+
+/* ---------- account (prototype: stored locally) ---------- */
+function hashPass(p){let h=0;for(let i=0;i<p.length;i++){h=(h*31+p.charCodeAt(i))|0;}return 'h'+h;}
+function authMsg(t){document.getElementById('authMsg').innerHTML=t;}
+function openAuth(){
+  authMsg(user?'':'create an account or log in to begin.');
+  ['compose','shore','read','shopPanel'].forEach(id=>document.getElementById(id).classList.remove('open'));
+  document.getElementById('authPanel').classList.add('open');
+}
+document.getElementById('signupBtn').onclick=()=>{
+  const name=document.getElementById('authName').value.trim();
+  const email=document.getElementById('authEmail').value.trim().toLowerCase();
+  const pass=document.getElementById('authPass').value;
+  if(!name||!email||!pass){authMsg('fill in all three, castaway.');return;}
+  if(accounts[email]){authMsg('that email already has a shore. try logging in.');return;}
+  accounts[email]={name,pass:hashPass(pass),created:Date.now()};
+  localStorage.setItem('mib_accounts',JSON.stringify(accounts));
+  user={name,email};localStorage.setItem('mib_user',JSON.stringify(user));
+  inv=1;save();refreshInv();refreshUser();           // first bottle free
+  document.getElementById('authPanel').classList.remove('open');
+  toast(`Welcome aboard, <em>${name}</em>. Your first bottle is free.`);
+};
+document.getElementById('loginBtn').onclick=()=>{
+  const email=document.getElementById('authEmail').value.trim().toLowerCase();
+  const pass=hashPass(document.getElementById('authPass').value);
+  const a=accounts[email];
+  if(!a||a.pass!==pass){authMsg('no such shore, or wrong password.');return;}
+  user={name:a.name,email};localStorage.setItem('mib_user',JSON.stringify(user));
+  document.getElementById('authPanel').classList.remove('open');
+  refreshUser();
+  toast(`Welcome back, <em>${a.name}</em>.`);
+};
+document.getElementById('logoutBtn').onclick=()=>{
+  user=null;replyTo=null;
+  localStorage.removeItem('mib_user');
+  refreshUser();
+  ['compose','shore','read','shopPanel'].forEach(id=>document.getElementById(id).classList.remove('open'));
+  openAuth();
+};
+
+/* ---------- shop : the chandlery ---------- */
+document.getElementById('shopBtn').onclick=()=>{
+  if(!user){openAuth();return;}
+  document.getElementById('shopPanel').classList.add('open');
+};
+document.getElementById('buy1').onclick=()=>{
+  inv+=PACKS.one.n;save();refreshInv();
+  document.getElementById('shopPanel').classList.remove('open');
+  toast(`Receipt: ${PACKS.one.price} — <em>1 bottle</em> added to your satchel.`);
+};
+document.getElementById('buy5').onclick=()=>{
+  inv+=PACKS.five.n;save();refreshInv();
+  document.getElementById('shopPanel').classList.remove('open');
+  toast(`Receipt: ${PACKS.five.price} — <em>5 bottles</em> added to your satchel. A fine haul.`);
+};
 function fmtDays(h){const d=h/24;
   if(d<1)return'less than a day';if(d<2)return'about a day';
   return`about ${Math.round(d)} days`;}
@@ -355,9 +459,7 @@ function arrive(b){
   if(markers.has(b.id)){map.removeLayer(markers.get(b.id));markers.delete(b.id);}
   L.marker([b.lat,b.lon],{icon:ICO_SHELL}).addTo(map).bindPopup(
     `<i>Your bottle washed ashore after ${fmtDays(b.simElapsed)}.<br>Whoever finds it will write back… someday.</i>`);
-  coins+=EARN_ARRIVE;save();refreshCoins();
-  toast(`Your bottle reached a shore after <em>${fmtDays(b.simElapsed)}</em> — <em>+${EARN_ARRIVE} doubloons</em>.`);
-  save();
+  toast(`Your bottle reached a shore after <em>${fmtDays(b.simElapsed)}</em>. Someone will find it… someday.`);
 }
 /* nearest coastal waypoint */
 function nearestWP(lat,lon,exclude){
@@ -396,9 +498,11 @@ function step(dtSimHours){
 /* ---------- casting ---------- */
 function costLineText(){
   const el=document.getElementById('costLine');
-  el.innerHTML=freeUsed
-    ? `a bottle costs <b>${BOTTLE_COST} doubloons</b> · you have <b>${coins}</b>`
-    : `<b>your first bottle is free</b>`;
+  el.innerHTML = replyTo
+    ? `replies sail <b>free</b> — back to <em>${replyTo}</em>`
+    : inv>0
+      ? `you have <b>${inv}</b> bottle${inv===1?'':'s'} in your satchel`
+      : `no bottles left — visit <b>The Chandlery</b>`;
 }
 function refreshHomeChip(){
   document.getElementById('homeChip').innerHTML=
@@ -406,7 +510,11 @@ function refreshHomeChip(){
         :'Choose a shore first.';
 }
 document.getElementById('castBtn').onclick=()=>{
+  if(!user){openAuth();return;}
   if(!home){openHome();return;}
+  replyTo=null;
+  document.getElementById('shore').classList.remove('open');
+  document.getElementById('composeTitle').textContent='Write a message';
   refreshHomeChip();costLineText();
   document.getElementById('compose').classList.add('open');
 };
@@ -414,21 +522,27 @@ document.getElementById('sendBtn').onclick=()=>{
   const txt=document.getElementById('msgText').value.trim();
   if(!txt){toast('Write something first.');return;}
   if(!home){toast('Choose your shore first.');openHome();return;}
-  if(freeUsed && coins<BOTTLE_COST){
-    toast(`Not enough doubloons — a bottle costs <em>${BOTTLE_COST}</em>. Read bottles or wait for yours to land.`);
-    return;
+  const isReply=!!replyTo;
+  if(!isReply){
+    if(inv<1){
+      toast(`No bottles left. Visit <em>The Chandlery</em> — replies always sail free.`);
+      document.getElementById('shopPanel').classList.add('open');
+      return;
+    }
+    inv-=1;save();refreshInv();
   }
-  if(freeUsed){coins-=BOTTLE_COST;}else{freeUsed=true;}
-  save();refreshCoins();
   const t=nearestWP(home.lat,home.lon).wp;   // first stretch of coast from home
-  const b={id:'m'+Date.now(),text:txt,lat:home.lat,lon:home.lon,
+  const b={id:'m'+Date.now(),text:(isReply?`↩ to ${replyTo}: `:'')+txt,
+    lat:home.lat,lon:home.lon,
     simElapsed:0,maxHours:24*(30+Math.random()*300),mine:true,wp:t};
   myBottles.push(b);updateMarker(b);save();
   document.getElementById('msgText').value='';
+  replyTo=null;
   document.getElementById('compose').classList.remove('open');
   map.flyTo([home.lat,home.lon],4,{duration:2});
   costLineText();
-  toast('Cast. Your bottle rides the tide now.');
+  toast(isReply?'Your reply is swimming after them — free of charge.'
+               :'Cast. Your bottle rides the tide now.');
 };
 
 /* ---------- shore ---------- */
@@ -448,8 +562,8 @@ function refreshShore(){
       document.getElementById('tossBtn').style.display=sb.seed?'none':'';
       document.getElementById('tossBtn')._target=sb;
       document.getElementById('read').classList.add('open');
-      if(!sb.paid){sb.paid=true;coins+=EARN_READ;save();refreshCoins();
-        toast(`<em>+${EARN_READ} doubloons</em> for reading a stranger's words.`);}
+      readSb=sb;
+      document.getElementById('read').classList.add('open');
     };
     list.appendChild(d);
   });
@@ -468,8 +582,8 @@ setInterval(()=>{
       text:WASH_TEXTS[Math.floor(Math.random()*WASH_TEXTS.length)],
       from:STRANGER_NAMES[Math.floor(Math.random()*STRANGER_NAMES.length)],
       days:Math.round(20+Math.random()*400)});
-    coins+=EARN_WASH;save();refreshCoins();refreshShore();
-    toast(`A new bottle just <em>washed ashore</em> — <em>+${EARN_WASH} doubloons</em>.`);
+    refreshShore();
+    toast(`A new bottle just <em>washed ashore</em>. The tide brought company.`);
   }
 },25000);
 
@@ -480,6 +594,19 @@ document.getElementById('tossBtn').onclick=function(){
   document.getElementById('read').classList.remove('open');
   refreshShore();
   toast('Tossed back into the sea. Bon voyage.');
+};
+let readSb=null;
+document.getElementById('replyBtn').onclick=()=>{
+  if(!readSb)return;
+  replyTo=readSb.from;
+  document.getElementById('read').classList.remove('open');
+  document.getElementById('msgText').value='';
+  document.getElementById('shore').classList.remove('open');
+  document.getElementById('read').classList.remove('open');
+  document.getElementById('composeTitle').textContent='Write back';
+  document.getElementById('composeSub').textContent=`Your reply to ${replyTo} sails free — no bottle needed.`;
+  refreshHomeChip();costLineText();
+  document.getElementById('compose').classList.add('open');
 };
 
 /* ---------- home shore ---------- */
@@ -512,7 +639,8 @@ function drawHome(){
 }
 
 /* ---------- boot ---------- */
-refreshCoins();
+refreshInv();
+refreshUser();
 drawHome();
 if(!home)openHome();
 myBottles.forEach(updateMarker);
