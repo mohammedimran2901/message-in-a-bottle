@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Message in a Bottle</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -47,7 +47,7 @@
   .brand p{font-size:11px;letter-spacing:.34em;text-transform:uppercase;
     color:var(--dim);margin-top:2px;padding-left:.34em;}
 
-  .hud{display:flex;gap:12px;pointer-events:auto;margin-top:6px;flex-wrap:nowrap}
+  .hud{display:flex;gap:10px;pointer-events:auto;margin-top:6px;flex-wrap:wrap;justify-content:flex-end}
   .hud button,.hud #coinBadge{white-space:nowrap}
   .hud button{background:var(--glass);border:1px solid var(--line);color:var(--ink);
     font-family:'Jost',sans-serif;font-weight:300;font-size:12px;padding:10px 18px;
@@ -133,6 +133,50 @@
     border-radius:10px!important;transition:border-color .25s,color .25s;}
   .leaflet-bar a:hover{border-color:#eec87a!important;color:#eec87a!important}
 
+  /* ---------- new features ---------- */
+  #repChip{display:flex;align-items:center;gap:6px;background:var(--glass);
+    border:1px solid var(--line);border-radius:30px;padding:10px 16px;
+    font-size:13px;letter-spacing:.08em;backdrop-filter:blur(12px);white-space:nowrap}
+  #repChip b{color:var(--foam);font-weight:500}
+  .ink-row{display:flex;gap:8px;margin-top:12px;align-items:center}
+  .ink-row span.lbl{font-size:11px;color:var(--dim);letter-spacing:.12em;
+    text-transform:uppercase;font-family:'Jost',sans-serif;margin-right:2px}
+  .ink{width:30px;height:30px;border-radius:50%;cursor:pointer;
+    border:2px solid transparent;transition:transform .15s,border-color .2s}
+  .ink.sel{border-color:var(--accent);transform:scale(1.15)}
+  .opt-row{display:flex;gap:14px;margin-top:12px;flex-wrap:wrap}
+  .opt{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim);
+    font-family:'Jost',sans-serif;cursor:pointer;user-select:none}
+  .opt input{accent-color:#eec87a;width:15px;height:15px}
+  #icebreakerBtn{background:transparent;border:1px dashed var(--line);color:var(--dim);
+    font-family:'Jost',sans-serif;font-size:12px;padding:7px 14px;border-radius:20px;
+    cursor:pointer;letter-spacing:.08em;margin-top:10px;transition:color .2s,border-color .2s}
+  #icebreakerBtn:hover{color:var(--accent);border-color:var(--accent)}
+  .keep-release{display:flex;gap:10px;margin-top:14px}
+  .keep-release .btn{flex:1}
+  #repLine{margin-top:10px;font-size:12px;color:var(--dim);font-family:'Jost',sans-serif;
+    letter-spacing:.06em}
+  #repLine b{color:var(--foam);font-weight:500}
+
+  /* ---------- mobile-first bottom sheets ---------- */
+  @media (max-width:640px){
+    header{padding:12px 14px;flex-direction:column;align-items:stretch;gap:10px}
+    .brand h1{font-size:20px}
+    .brand p{font-size:9px;letter-spacing:.28em}
+    .hud{flex-wrap:wrap;gap:8px}
+    .hud button,.hud #coinBadge,#repChip{font-size:11px;padding:9px 14px}
+    .panel{width:100vw !important;max-width:none;left:0;top:auto;bottom:0;
+      transform:translateY(100%);border-radius:22px 22px 0 0;
+      max-height:82vh;overflow-y:auto;padding:24px 20px 28px}
+    .panel.open{animation:sheet .35s cubic-bezier(.2,.9,.3,1) forwards}
+    @keyframes sheet{to{opacity:1;transform:translateY(0) scale(1)}}
+    #legend{display:none}
+    .btn,.hud button{min-height:44px}
+    textarea{font-size:16px} /* prevents iOS zoom */
+    .keep-release{flex-direction:column}
+    #toast{white-space:normal;width:88vw;text-align:center;border-radius:16px}
+  }
+
 </style>
 </head>
 <body>
@@ -148,6 +192,7 @@
     <button id="logoutBtn" style="display:none">Log out</button>
     <button id="shopBtn">Get bottles</button>
     <div id="coinBadge"><b id="invN">0</b>&nbsp;bottles</div>
+    <div id="repChip">⚓ <b id="repN">50</b>&nbsp;rep</div>
     <button id="castBtn">Cast a bottle</button>
     <button id="shoreBtn">Inbox<span class="n" id="badge"><span class="n" id="badgeN">0</span></span></button>
   </div>
@@ -215,6 +260,16 @@
   <h2 id="composeTitle">Cast your message to the sea</h2>
   <p class="sub" id="composeSub">It may drift for days… or months. It will reach whoever the tide decides.</p>
   <textarea id="msgText" maxlength="280" placeholder="Dear stranger, …"></textarea>
+  <button id="icebreakerBtn" type="button">✦ stuck for words? spin an icebreaker</button>
+  <div class="ink-row" id="inkRow">
+    <span class="lbl">ink</span>
+    <div class="ink sel" data-ink="classic" style="background:#e8e2d2" title="Classic parchment"></div>
+    <div class="ink" data-ink="emerald" style="background:#0f2e26" title="Deep sea green"></div>
+    <div class="ink" data-ink="sunset" style="background:#3a1f1a" title="Sunset amber"></div>
+  </div>
+  <div class="opt-row">
+    <label class="opt"><input type="checkbox" id="tenYear"> 10-year bottle (a time capsule — drifts a decade)</label>
+  </div>
   <div class="home-chip" id="homeChip"></div>
   <div class="row" style="justify-content:flex-end">
     <button class="btn" id="sendBtn">Cast</button>
@@ -237,9 +292,13 @@
   <h2>A bottle, unstoppered</h2>
   <p class="sub" id="readMeta"></p>
   <div id="readBody" style="font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.85;white-space:pre-wrap;color:#efe9db"></div>
-  <div class="row">
-    <button class="btn" id="replyBtn">Write back — free</button>
-    <button class="btn ghost" id="tossBtn">Toss it back into the sea</button>
+  <div id="repLine"></div>
+  <div class="keep-release" id="keepReleaseRow">
+    <button class="btn" id="keepBtn">Keep this bottle</button>
+    <button class="btn ghost" id="releaseBtn">Release it back to the sea</button>
+  </div>
+  <div class="row" id="keptRow" style="display:none">
+    <button class="btn" id="replyBtn" style="flex:1">Write back — free</button>
   </div>
 </div>
 
@@ -286,6 +345,9 @@ let home      = JSON.parse(localStorage.getItem('mib_home')||'null');
 let user      = JSON.parse(localStorage.getItem('mib_user')||'null');
 let accounts  = JSON.parse(localStorage.getItem('mib_accounts')||'{}');
 let replyTo   = null;   // name of stranger we're answering (replies are free)
+let rep       = parseInt(localStorage.getItem('mib_rep')||'50',10);
+let holiday   = localStorage.getItem('mib_holiday')==='1';
+let selInk    = 'classic';
 const markers = new Map();
 
 const PACKS={one:{n:1,price:'$1.99'},five:{n:5,price:'$3.99'}};
@@ -352,8 +414,15 @@ function save(){
   localStorage.setItem('mib_mine',JSON.stringify(myBottles));
   localStorage.setItem('mib_shore',JSON.stringify(shore));
   localStorage.setItem('mib_inv',String(inv));
+  localStorage.setItem('mib_rep',String(rep));
+  localStorage.setItem('mib_holiday',holiday?'1':'0');
 }
 function refreshInv(){document.getElementById('invN').textContent=inv;}
+function refreshRep(){document.getElementById('repN').textContent=rep;}
+function tenYearLabel(b){
+  if(b.tenYear){const y=b.simElapsed/(24*365);return y>=1?`${Math.floor(y)} years`:`${Math.round(y*12)} months`;}
+  return fmtDays(b.simElapsed);
+}
 function refreshUser(){
   const chip=document.getElementById('userChip'),
         out=document.getElementById('logoutBtn');
@@ -459,7 +528,8 @@ function arrive(b){
   if(markers.has(b.id)){map.removeLayer(markers.get(b.id));markers.delete(b.id);}
   L.marker([b.lat,b.lon],{icon:ICO_SHELL}).addTo(map).bindPopup(
     `<i>Your bottle washed ashore after ${fmtDays(b.simElapsed)}.<br>Whoever finds it will write back… someday.</i>`);
-  toast(`Your bottle reached a shore after <em>${fmtDays(b.simElapsed)}</em>. Someone will find it… someday.`);
+  toast(`Your bottle reached a shore after <em>${tenYearLabel(b)}</em>. Someone will find it… someday.`);
+  rep+=3;save();refreshRep();
 }
 /* nearest coastal waypoint */
 function nearestWP(lat,lon,exclude){
@@ -532,9 +602,12 @@ document.getElementById('sendBtn').onclick=()=>{
     inv-=1;save();refreshInv();
   }
   const t=nearestWP(home.lat,home.lon).wp;   // first stretch of coast from home
+  const tenYear=document.getElementById('tenYear').checked;
   const b={id:'m'+Date.now(),text:(isReply?`↩ to ${replyTo}: `:'')+txt,
-    lat:home.lat,lon:home.lon,
-    simElapsed:0,maxHours:24*(30+Math.random()*300),mine:true,wp:t};
+    lat:home.lat,lon:home.lon,ink:selInk,
+    simElapsed:0,
+    maxHours:tenYear?24*365*10:24*(30+Math.random()*300),
+    tenYear:tenYear,mine:true,wp:t};
   myBottles.push(b);updateMarker(b);save();
   document.getElementById('msgText').value='';
   replyTo=null;
@@ -545,7 +618,44 @@ document.getElementById('sendBtn').onclick=()=>{
                :'Cast. Your bottle rides the tide now.');
 };
 
-/* ---------- shore ---------- */
+/* icebreakers — inspired by Bottled's Spin the Bottle */
+const ICEBREAKERS=[
+ "If you could live in any coastal city, which one?",
+ "What's the last thing that made you stop and stare?",
+ "Never have I ever… (finish it honestly)",
+ "Would you rather sail around the world or never leave your hometown?",
+ "What did you want to be when you were ten?",
+ "Describe your week in exactly three words.",
+ "What song has been stuck in your head lately?",
+ "Sunrise or sunset — and why?",
+ "What's something kind a stranger once did for you?",
+ "If today had a soundtrack, what would be playing?",
+];
+document.getElementById('icebreakerBtn').onclick=()=>{
+  const p=ICEBREAKERS[Math.floor(Math.random()*ICEBREAKERS.length)];
+  const ta=document.getElementById('msgText');
+  ta.value=(ta.value?ta.value+'\n\n':'')+p;
+  ta.focus();
+};
+/* ink selection */
+document.querySelectorAll('#inkRow .ink').forEach(el=>{
+  el.onclick=()=>{
+    document.querySelectorAll('#inkRow .ink').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');selInk=el.dataset.ink;
+  };
+});
+const INK_STYLES={
+ classic:{bg:'#0f1c28cc',fg:'#efe9db'},
+ emerald:{bg:'#0c241ecc',fg:'#c8ecdd'},
+ sunset: {bg:'#2b1712cc',fg:'#f5dcc0'},
+};
+/* holiday mode: tap the rep chip */
+document.getElementById('repChip').onclick=()=>{
+  holiday=!holiday;save();
+  toast(holiday?'Holiday mode <em>on</em> — the tide will bring no new bottles.'
+               :'Holiday mode <em>off</em> — bottles may wash ashore again.');
+};
+
 function refreshShore(){
   const list=document.getElementById('shoreList');list.innerHTML='';
   SEED_SHORE.concat(shore).forEach(sb=>{
@@ -559,10 +669,18 @@ function refreshShore(){
       document.getElementById('readMeta').textContent=
         `Found on your shore · set adrift by ${sb.from}`;
       document.getElementById('readBody').textContent=sb.text;
-      document.getElementById('tossBtn').style.display=sb.seed?'none':'';
-      document.getElementById('tossBtn')._target=sb;
-      document.getElementById('read').classList.add('open');
+      const st=INK_STYLES[sb.ink||'classic'];
+      document.getElementById('readBody').style.background=st.bg;
+      document.getElementById('readBody').style.color=st.fg;
+      document.getElementById('readBody').style.padding='18px';
+      document.getElementById('readBody').style.borderRadius='12px';
       readSb=sb;
+      const kept=!!sb.kept;
+      document.getElementById('shore').classList.remove('open');
+      document.getElementById('keepReleaseRow').style.display=kept?'none':'flex';
+      document.getElementById('keptRow').style.display=kept?'flex':'none';
+      document.getElementById('repLine').innerHTML=
+        `anchored by you · rep <b>${rep}</b>${kept?' · kept':''}`;
       document.getElementById('read').classList.add('open');
     };
     list.appendChild(d);
@@ -575,8 +693,9 @@ document.getElementById('shoreBtn').onclick=()=>{
   refreshShore();document.getElementById('shore').classList.add('open');
 };
 
-/* stranger bottles randomly wash up */
+/* stranger bottles randomly wash up (paused by holiday mode) */
 setInterval(()=>{
+  if(holiday)return;
   if(Math.random()<.28 && shore.length<9){
     shore.push({id:'w'+Date.now(),
       text:WASH_TEXTS[Math.floor(Math.random()*WASH_TEXTS.length)],
@@ -587,14 +706,32 @@ setInterval(()=>{
   }
 },25000);
 
-/* toss back */
-document.getElementById('tossBtn').onclick=function(){
-  const sb=this._target;if(!sb)return;
-  shore=shore.filter(b=>b!==sb);save();
-  document.getElementById('read').classList.remove('open');
+/* keep / release — the Bottled-style decision */
+document.getElementById('keepBtn').onclick=()=>{
+  if(!readSb)return;
+  readSb.kept=true;rep+=2;save();refreshRep();
+  document.getElementById('keepReleaseRow').style.display='none';
+  document.getElementById('keptRow').style.display='flex';
+  document.getElementById('repLine').innerHTML=
+    `anchored by you · rep <b>${rep}</b> · kept`;
   refreshShore();
-  toast('Tossed back into the sea. Bon voyage.');
+  toast(`Kept. <em>+2 rep</em> — you can write back anytime, free.`);
 };
+document.getElementById('releaseBtn').onclick=()=>{
+  if(!readSb)return;
+  const sb=readSb;
+  shore=shore.filter(b=>b!==sb);rep+=1;save();refreshRep();
+  document.getElementById('read').classList.remove('open');
+  // the bottle drifts on — visible on the map, heading to another shore
+  const dr={id:'r'+Date.now(),text:sb.text,from:sb.from,
+    lat:(Math.random()*60-30),lon:(Math.random()*300-150),
+    simElapsed:0,maxHours:99999,mine:false};
+  updateMarker(dr);
+  setTimeout(()=>{if(markers.has(dr.id)){map.removeLayer(markers.get(dr.id));markers.delete(dr.id);}},15000);
+  refreshShore();
+  toast(`Released. The bottle drifts on to another shore — <em>+1 rep</em> for your generosity.`);
+};
+
 let readSb=null;
 document.getElementById('replyBtn').onclick=()=>{
   if(!readSb)return;
@@ -640,6 +777,7 @@ function drawHome(){
 
 /* ---------- boot ---------- */
 refreshInv();
+refreshRep();
 refreshUser();
 drawHome();
 if(!home)openHome();
