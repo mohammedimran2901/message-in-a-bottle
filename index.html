@@ -158,6 +158,25 @@
     letter-spacing:.06em}
   #repLine b{color:var(--foam);font-weight:500}
 
+  /* ---------- persona onboarding (Bottled-inspired, our own voice) ---------- */
+  .persona-row{display:flex;gap:10px;margin-top:14px}
+  .persona{flex:1;border:1px solid var(--line);border-radius:14px;padding:14px 10px;
+    text-align:center;cursor:pointer;transition:border-color .25s,transform .2s,background .25s;
+    background:#08122066}
+  .persona:hover{transform:translateY(-2px)}
+  .persona.sel{border-color:var(--accent);background:#eec87a14}
+  .persona .glyph{font-size:22px;display:block}
+  .persona .pname{display:block;margin-top:6px;font-family:'Jost',sans-serif;
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--foam)}
+  .persona .pdesc{display:block;margin-top:4px;font-size:11px;color:var(--dim);
+    font-family:'Jost',sans-serif;line-height:1.4}
+  #keeperNote{margin-top:12px;font-size:13px;color:var(--dim);font-style:italic;
+    font-family:'Cormorant Garamond',serif;letter-spacing:.03em}
+  #keeperNote b{color:var(--accent);font-weight:500}
+  .shore-empty{border:1px dashed var(--line);border-radius:14px;padding:26px 20px;
+    text-align:center;color:var(--dim);font-family:'Cormorant Garamond',serif;
+    font-size:16px;font-style:italic;line-height:1.6}
+
   /* ---------- mobile-first bottom sheets ---------- */
   @media (max-width:640px){
     header{padding:12px 14px;flex-direction:column;align-items:stretch;gap:10px}
@@ -240,9 +259,13 @@
   <p class="sub">This is where you live now. Your bottles cast off from here —
   and the tide will only carry them along the world's coastlines.</p>
   <select id="homeSpot" style="width:100%"></select>
-  <div class="row" style="justify-content:flex-end">
-    <button class="btn" id="homeBtn">Settle here</button>
+  <div class="persona-row" id="personaRow">
+    <div class="persona sel" data-p="sailor"><span class="glyph">⚓</span><span class="pname">Sailor</span><span class="pdesc">friends & far horizons</span></div>
+    <div class="persona" data-p="treasure"><span class="glyph">✦</span><span class="pname">Treasure Seeker</span><span class="pdesc">hunting one rare gem</span></div>
+    <div class="persona" data-p="drifter"><span class="glyph">☾</span><span class="pname">Night Drifter</span><span class="pdesc">honest words, no agenda</span></div>
   </div>
+  <div id="keeperNote"></div>
+  <button class="btn" id="homeBtn" style="width:100%;margin-top:14px">Settle here</button>
 </div>
 
 <div id="vignette"></div>
@@ -348,7 +371,23 @@ let replyTo   = null;   // name of stranger we're answering (replies are free)
 let rep       = parseInt(localStorage.getItem('mib_rep')||'50',10);
 let holiday   = localStorage.getItem('mib_holiday')==='1';
 let selInk    = 'classic';
+let persona   = localStorage.getItem('mib_persona')||'sailor';
 const markers = new Map();
+const PERSONAS={
+  sailor:   {name:'Sailor',         glyph:'⚓', tag:'sailing for friendship'},
+  treasure: {name:'Treasure Seeker',glyph:'✦', tag:'hunting one rare gem'},
+  drifter:  {name:'Night Drifter',  glyph:'☾', tag:'drifting with honest words'},
+};
+const KEEPER={
+  welcome:  'The keeper of this shore bids you welcome. Every bottle finds a tide eventually.',
+  firstCast:'“First one is always the hardest to let go of,” says the keeper.',
+  landed:   '“The sea kept it a while,” the keeper murmurs, “but nothing stays lost forever.”',
+  shopPoor: 'The keeper eyes your empty satchel. “The chandlery is that way, friend.”',
+  kept:     '“A good find,” nods the keeper. “Some bottles are meant to be opened twice.”',
+  released: '“Generous,” the keeper says, watching it go. “The sea remembers that.”',
+  holiday:  '“Rest, then,” says the keeper, dimming the lighthouse lamp.',
+  washUp:   'The keeper raps the window: “Another one came in with the tide.”',
+};
 
 const PACKS={one:{n:1,price:'$1.99'},five:{n:5,price:'$3.99'}};
 
@@ -411,7 +450,8 @@ const WASH_TEXTS=[
 
 /* ---------- helpers ---------- */
 function save(){
-  localStorage.setItem('mib_mine',JSON.stringify(myBottles));
+  const clean=b=>{const {_trail,_trailLine,wp,...rest}=b;return rest;};
+  localStorage.setItem('mib_mine',JSON.stringify(myBottles.map(clean)));
   localStorage.setItem('mib_shore',JSON.stringify(shore));
   localStorage.setItem('mib_inv',String(inv));
   localStorage.setItem('mib_rep',String(rep));
@@ -450,6 +490,7 @@ document.getElementById('signupBtn').onclick=()=>{
   user={name,email};localStorage.setItem('mib_user',JSON.stringify(user));
   inv=1;save();refreshInv();refreshUser();           // first bottle free
   document.getElementById('authPanel').classList.remove('open');
+  if(!home)openHome();
   toast(`Welcome aboard, <em>${name}</em>. Your first bottle is free.`);
 };
 document.getElementById('loginBtn').onclick=()=>{
@@ -489,9 +530,22 @@ function fmtDays(h){const d=h/24;
   if(d<1)return'less than a day';if(d<2)return'about a day';
   return`about ${Math.round(d)} days`;}
 function toast(html){
-  const t=document.getElementById('toast');
-  t.innerHTML=html;t.classList.add('show');
-  clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),4200);
+  const el=document.getElementById('toast');
+  el.innerHTML=html.startsWith('keeper:')?KEEPER[html.slice(7)]:html;
+  el.classList.add('show');clearTimeout(toast._t);
+  toast._t=setTimeout(()=>el.classList.remove('show'),4200);
+}
+document.querySelectorAll('#personaRow .persona').forEach(el=>{
+  el.onclick=()=>{
+    document.querySelectorAll('#personaRow .persona').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');persona=el.dataset.p;
+    document.getElementById('keeperNote').innerHTML=
+      `${KEEPER.welcome}<br><b>${PERSONAS[persona].glyph} ${PERSONAS[persona].name}</b> — ${PERSONAS[persona].tag}.`;
+  };
+});
+if(persona!=='sailor'){
+  document.querySelectorAll('#personaRow .persona').forEach(x=>
+    x.classList.toggle('sel',x.dataset.p===persona));
 }
 document.querySelectorAll('.close-x').forEach(x=>
   x.onclick=()=>document.getElementById(x.dataset.close).classList.remove('open'));
@@ -520,15 +574,36 @@ function updateMarker(b){
     m=L.marker([b.lat,b.lon],{icon:b.mine?ICO_MINE:ICO_DRIFT}).addTo(map)
       .bindTooltip(b.mine?'your bottle':"a stranger's bottle",{direction:'top'});
     markers.set(b.id,m);
+    b._trail=[];                       // wake trail history
+    b._trailLine=L.polyline([],{color:'#9fd8ef',weight:1.2,opacity:.5,
+      dashArray:'2 5'}).addTo(map);
   }
   m.setLatLng([b.lat,b.lon]);
+  // record wake (throttled) and redraw the fading trail
+  const t=b._trail, last=t[t.length-1];
+  if(!last || Math.hypot(last[0]-b.lat,last[1]-b.lon)>.4){
+    t.push([b.lat,b.lon]);
+    if(t.length>60)t.shift();
+    b._trailLine.setLatLngs(t);
+  }
+}
+function splash(lat,lon){
+  for(let i=0;i<3;i++){
+    setTimeout(()=>{
+      const ring=L.circleMarker([lat,lon],{radius:4+i*7,color:'#bfe4f2',weight:1.5,
+        opacity:.7-i*.2,fill:false}).addTo(map);
+      setTimeout(()=>map.removeLayer(ring),1100);
+    },i*350);
+  }
 }
 function arrive(b){
   b.arrivedAt=Date.now();
   if(markers.has(b.id)){map.removeLayer(markers.get(b.id));markers.delete(b.id);}
+  if(b._trailLine){map.removeLayer(b._trailLine);}
+  splash(b.lat,b.lon);
   L.marker([b.lat,b.lon],{icon:ICO_SHELL}).addTo(map).bindPopup(
     `<i>Your bottle washed ashore after ${fmtDays(b.simElapsed)}.<br>Whoever finds it will write back… someday.</i>`);
-  toast(`Your bottle reached a shore after <em>${tenYearLabel(b)}</em>. Someone will find it… someday.`);
+  toast(`${KEEPER.landed}<br><em>Adrift ${tenYearLabel(b)} — someone will find it… someday. +3 rep.</em>`);
   rep+=3;save();refreshRep();
 }
 /* nearest coastal waypoint */
@@ -615,7 +690,7 @@ document.getElementById('sendBtn').onclick=()=>{
   map.flyTo([home.lat,home.lon],4,{duration:2});
   costLineText();
   toast(isReply?'Your reply is swimming after them — free of charge.'
-               :'Cast. Your bottle rides the tide now.');
+               :'Cast. Your bottle rides the tide now.<br><em>'+PERSONAS[persona].glyph+' '+PERSONAS[persona].tag+'</em>');
 };
 
 /* icebreakers — inspired by Bottled's Spin the Bottle */
@@ -652,13 +727,17 @@ const INK_STYLES={
 /* holiday mode: tap the rep chip */
 document.getElementById('repChip').onclick=()=>{
   holiday=!holiday;save();
-  toast(holiday?'Holiday mode <em>on</em> — the tide will bring no new bottles.'
+  toast(holiday?'keeper:holiday'
                :'Holiday mode <em>off</em> — bottles may wash ashore again.');
 };
 
 function refreshShore(){
   const list=document.getElementById('shoreList');list.innerHTML='';
-  SEED_SHORE.concat(shore).forEach(sb=>{
+  const all=SEED_SHORE.concat(shore);
+  if(!all.length){
+    list.innerHTML='<div class="shore-empty">The tide is quiet tonight.<br>No bottles yet — cast one, and the sea will answer.</div>';
+  }
+  all.forEach(sb=>{
     const d=document.createElement('div');
     d.style.cssText='border:1px solid #1f3547;border-radius:14px;padding:16px 18px;cursor:pointer;background:#08122066;transition:border-color .25s, transform .2s';
     d.onmouseenter=()=>{d.style.borderColor='#eec87a88';d.style.transform='translateY(-1px)';};
@@ -702,7 +781,7 @@ setInterval(()=>{
       from:STRANGER_NAMES[Math.floor(Math.random()*STRANGER_NAMES.length)],
       days:Math.round(20+Math.random()*400)});
     refreshShore();
-    toast(`A new bottle just <em>washed ashore</em>. The tide brought company.`);
+    toast('keeper:washUp<br><em>A new bottle just washed ashore.</em>');
   }
 },25000);
 
@@ -715,7 +794,7 @@ document.getElementById('keepBtn').onclick=()=>{
   document.getElementById('repLine').innerHTML=
     `anchored by you · rep <b>${rep}</b> · kept`;
   refreshShore();
-  toast(`Kept. <em>+2 rep</em> — you can write back anytime, free.`);
+  toast('keeper:kept<br><em>+2 rep</em> — write back anytime, free.');
 };
 document.getElementById('releaseBtn').onclick=()=>{
   if(!readSb)return;
@@ -729,7 +808,7 @@ document.getElementById('releaseBtn').onclick=()=>{
   updateMarker(dr);
   setTimeout(()=>{if(markers.has(dr.id)){map.removeLayer(markers.get(dr.id));markers.delete(dr.id);}},15000);
   refreshShore();
-  toast(`Released. The bottle drifts on to another shore — <em>+1 rep</em> for your generosity.`);
+  toast('keeper:released<br><em>+1 rep</em> for your generosity.');
 };
 
 let readSb=null;
@@ -780,7 +859,8 @@ refreshInv();
 refreshRep();
 refreshUser();
 drawHome();
-if(!home)openHome();
+if(!user)openAuth();
+else if(!home)openHome();
 myBottles.forEach(updateMarker);
 refreshShore();
 let last=performance.now();
